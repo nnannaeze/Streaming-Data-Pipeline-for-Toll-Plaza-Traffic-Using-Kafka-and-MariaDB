@@ -194,6 +194,236 @@ kafka.cluster.id=e9ae6dbd-df6a-4a7e-a92b-48aede607e5a
   cd /opt/kafka
   ./bin/kafka-server-start.sh config/kraft/server.properties
   ```
+![img001](a4.PNG)
+Kafka is running successfully!
+
+### 1.3 **Create Kafka Topic Using `confluent_kafka.admin` (KRaft)**
+
+Once Kafka was up and running in **KRaft mode**, I programmatically created the topic using the `confluent_kafka` Python library. This library simplifies Kafka topic management.
+I used the code command to create the python script ***toll_admin.py*** and also open the script in a ***VSCODE editor*** using
+```bash
+python3 -m venv myenv
+source myenv/bin/activate
+code toll_admin.py
+```
+I copied the code below to the ***toll_admin.py*** script to create a new topic ***toll_data***:
+
+```python
+from confluent_kafka.admin import AdminClient, NewTopic
+
+# Step 1: Configure the Kafka AdminClient
+admin_client = AdminClient({
+    "bootstrap.servers": "localhost:9092"  # Replace with your broker details if needed
+})
+
+# Step 2: Define the new topic
+new_topic = NewTopic("toll_data", num_partitions=1, replication_factor=1)
+
+# Step 3: Create the topic
+print("Creating topic 'toll_data'...")
+response = admin_client.create_topics([new_topic])
+
+# Step 4: Verify topic creation
+for topic, future in response.items():
+    try:
+        future.result()  # Blocks until Kafka confirms topic creation
+        print(f"Topic '{topic}' created successfully.")
+    except Exception as e:
+        print(f"Failed to create topic '{topic}': {e}")
+```
+### 1.4 **Verify Kafka Topic Creation**
+
+After running the script to create the topic, I confirmed its successful creation by listing the available topics in Kafka. To do this, I ran the following command:
+
+```bash
+bin/kafka-topics.sh --list --bootstrap-server localhost:9092
+```
+
+---
+
+## Phase 2: MariaDB Setup
+This is the phase were I set up the database that will recieve the streaming data. i performed the following steps to achieve it.
+
+### 2.1 **Install and Start MariaDB**
+Start MariaDB service using the following command:
+
+```bash
+sudo service mariadb start
+```
+### 2.2 **Log in to MariaDB**
+
+I run the following command to log in as the root user:
+
+```bash
+mysql -u root -p
+```
+### 2.3 **Create a database called traffic_db**
+```sql
+CREATE DATABASE traffic_db;
+```
+### 2.4 **Create the table to store toll data:**
+
+```sql
+USE traffic_db;
+CREATE TABLE toll_data (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    vehicle_id VARCHAR(50) NOT NULL,
+    vehicle_type VARCHAR(20) NOT NULL,
+    toll_plaza_id VARCHAR(50) NOT NULL,
+    timestamp DATETIME NOT NULL
+);
+```
+### 2.5 **Create a database use**
+This was majorly to create a User traffic_user that with password has access to the database.
+```sql
+CREATE USER 'traffic_user'@'localhost' IDENTIFIED BY 'secure_password';
+GRANT ALL PRIVILEGES ON traffic_db.* TO 'traffic_user'@'localhost';
+FLUSH PRIVILEGES;
+```
+## Phase 3: Data Simulation and Streaming
+###  3.1 **Kafka Producer (Data Generation)**
+Now, we'll simulate traffic data using the Faker library. Here's a Python script for generating data and pushing it to the Kafka topic toll
+```python
+from confluent_kafka import Producer
+from faker import Faker
+import json
+import time
+import random
+
+# Initialize Faker
+fake = Faker()
+
+# Kafka configuration
+conf = {'bootstrap.servers': 'localhost:9092'}
+producer = Producer(conf)
+
+# Define the message delivery callback
+def delivery_report(err, msg):
+    if err:
+        print(f"Delivery failed for {msg.key()}: {err}")
+    else:
+        print(f"Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")
+
+def generate_vehicle_data():
+    vehicle_types = ['Car', 'Truck', 'Motorcycle', 'Bus']
+    return {
+        'vehicle_id': fake.uuid4(),
+        'vehicle_type': random.choice(vehicle_types),
+        'toll_plaza_id': f"TP{random.randint(1, 10):03}",
+        'timestamp': fake.date_time().isoformat()
+    }
+
+if __name__ == "__main__":
+    try:
+        while True:
+            vehicle_data = generate_vehicle_data()
+            # Send data to the Kafka topic
+            producer.produce('toll', key=vehicle_data['vehicle_id'], value=json.dumps(vehicle_data), callback=delivery_report)
+            producer.poll(0)
+            time.sleep(random.uniform(0.5, 2))  # Simulate traffic with random delays
+    except KeyboardInterrupt:
+        print("Producer interrupted")
+    finally:
+        producer.flush()
+```
+Execute this script by running:
+###  3.2 **Execute this script by running:**
+```python
+python producer.py
+```
+
+## Phase 4: Kafka Consumer (Data Ingestion into MariaDB)
+##   4.1 **Kafka Consumer**
+Now, we will create a Python consumer script to consume messages from Kafka and insert them into the MariaDB database. This will handle each message, parse it, and store it in the toll_data table.
+```python
+from confluent_kafka import Consumer, KafkaException
+import mariadb
+import json
+
+# Kafka configuration
+conf = {
+    'bootstrap.servers': 'localhost:9092',
+    'group.id': 'toll_consumer_group',
+    'auto.offset.reset': 'earliest'
+}
+
+consumer = Consumer(conf)
+consumer.subscribe(['toll'])
+
+# MySQL configuration
+db_config = {
+    'user': 'traffic_user',
+    'password': 'secure_password',
+    'host': '127.0.0.1',
+    'database': 'traffic_db',
+    
+}
+
+# Connect to MySQL
+cnx = mariadb.connect(**db_config)
+cursor = cnx.cursor()
+
+insert_stmt = (
+    "INSERT INTO toll_data (vehicle_id, vehicle_type, toll_plaza_id, timestamp) "
+    "VALUES (?, ?, ?, ?)"
+)
+
+def consume_messages():
+    try:
+        while True:
+            msg = consumer.poll(1.0)  # Timeout in seconds
+            if msg is None:
+                continue
+            if msg.error():
+                if msg.error().code() == KafkaException._PARTITION_EOF:
+                    # End of partition event
+                    continue
+                else:
+                    print(msg.error())
+                    break
+            else:
+                # Proper message
+                data = json.loads(msg.value().decode('utf-8'))
+                record = (
+                    data['vehicle_id'],
+                    data['vehicle_type'],
+                    data['toll_plaza_id'],
+                    data['timestamp']
+                )
+                try:
+                    cursor.execute(insert_stmt, record)
+                    cnx.commit()
+                    print(f"Inserted record for vehicle_id: {data['vehicle_id']}")
+                except mysql.connector.Error as err:
+                    print(f"Error: {err}")
+                    cnx.rollback()
+    except KeyboardInterrupt:
+        print("Consumer interrupted")
+    finally:
+        consumer.close()
+        cursor.close()
+        cnx.close()
+
+if __name__ == "__main__":
+    consume_messages()
+```
+##   4.1 *Run the consumer with:**
+```bash
+python consumer.py
+```
+
+##   Verification
+###   Step 1: **Verify Insertion in MariaDB**
+After running the producer and consumer, I'll verify if the data is inserted into the MariaDB table:
+```bash
+mysql -u traffic_user -p
+USE traffic_db;
+SELECT * FROM toll_data ORDER BY id DESC LIMIT 10;
+```
+
+
+
+
 
 
 
