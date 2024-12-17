@@ -130,7 +130,73 @@ Ensure the following components are installed before proceeding:
   ```bash
   pip install mariadb
   ```
-![img101](a2.png)
+![img001](a2.PNG)
+
+-   ***faker***
+   I used faker to be able to generate random/unique data values
+
+  ```bash
+   pip install faker
+  ```
+![img001](a3.PNG)
+
+---
+
+## Step-by-Step Pipeline Setup
+
+### Phase 1: Kafka Setup in KRaft Mode
+
+Kafka in **KRaft mode** does not rely on Zookeeper. Instead, the Kafka broker acts as both the broker and controller. Below are the steps to configure and start Kafka in KRaft mode.
+
+---
+
+### 1.1 **Configure Kafka for KRaft Mode**
+
+I Modified the `kraft/server.properties` configuration file to include the following settings:
+
+```properties
+listeners=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
+advertised.listeners=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
+
+# Controller listener (separate port)
+listener.security.protocol.map=PLAINTEXT:PLAINTEXT
+listener.name.controller=PLAINTEXT
+listeners=PLAINTEXT://localhost:9092,PLAINTEXT://localhost:9093
+advertised.listeners=PLAINTEXT://localhost:9092,PLAINTEXT://localhost:9093
+
+# Controller configuration (make sure the controller port is separate)
+controller.listener.names=CONTROLLER
+inter.broker.listener.name=PLAINTEXT
+controller.quorum.voters=1@localhost:9093
+
+# Directories for logs and metadata
+log.dirs=/var/lib/kafka-logs
+metadata.log.dir=/var/lib/kafka-metadata
+
+# KRaft mode enabled
+KRaft.mode=true
+node.id=1
+
+# Kafka roles in KRaft mode (Broker and Controller)
+process.roles=broker,controller
+kafka.cluster.id=e9ae6dbd-df6a-4a7e-a92b-48aede607e5a
+```
+
+### 1.2 **Start Kafka in KRaft Mode**
+
+- I opened a new Terminal,
+- Changed directory to ***/opt/Kafka***
+  ```bash
+  cd /opt/kafka
+  ```
+- Start Kafka
+  ```bash
+  cd /opt/kafka
+  ./bin/kafka-server-start.sh config/kraft/server.properties
+  ```
+
+
+
 
 
     
