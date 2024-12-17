@@ -238,7 +238,7 @@ After running the script to create the topic, I confirmed its successful creatio
 ```bash
 bin/kafka-topics.sh --list --bootstrap-server localhost:9092
 ```
-
+![img001](a6.PNG)
 ---
 
 ## Phase 2: MariaDB Setup
@@ -273,10 +273,10 @@ CREATE TABLE toll_data (
     timestamp DATETIME NOT NULL
 );
 ```
-### 2.5 **Create a database use**
+### 2.5 **Create a database user**
 This was majorly to create a User traffic_user that with password has access to the database.
 ```sql
-CREATE USER 'traffic_user'@'localhost' IDENTIFIED BY 'secure_password';
+CREATE USER 'traffic_user'@'localhost' IDENTIFIED BY 'nnannaeze777';
 GRANT ALL PRIVILEGES ON traffic_db.* TO 'traffic_user'@'localhost';
 FLUSH PRIVILEGES;
 ```
@@ -331,7 +331,9 @@ Execute this script by running:
 ```python
 python producer.py
 ```
+![img001](a7.PNG)
 
+---
 ## Phase 4: Kafka Consumer (Data Ingestion into MariaDB)
 ##   4.1 **Kafka Consumer**
 Now, we will create a Python consumer script to consume messages from Kafka and insert them into the MariaDB database. This will handle each message, parse it, and store it in the toll_data table.
@@ -353,7 +355,7 @@ consumer.subscribe(['toll'])
 # MySQL configuration
 db_config = {
     'user': 'traffic_user',
-    'password': 'secure_password',
+    'password': 'nnannaeze777',
     'host': '127.0.0.1',
     'database': 'traffic_db',
     
@@ -407,11 +409,15 @@ def consume_messages():
 if __name__ == "__main__":
     consume_messages()
 ```
+
+
 ##   4.1 *Run the consumer with:**
 ```bash
 python consumer.py
 ```
+![img001](a8.PNG)
 
+---
 ##   Verification
 ###   Step 1: **Verify Insertion in MariaDB**
 After running the producer and consumer, I'll verify if the data is inserted into the MariaDB table:
@@ -420,8 +426,40 @@ mysql -u traffic_user -p
 USE traffic_db;
 SELECT * FROM toll_data ORDER BY id DESC LIMIT 10;
 ```
+![img001](a9.PNG)
 
+![img001](a11.PNG)
 
+## **Conclusion**
+
+In this project, I successfully built a streaming data pipeline to analyze and manage toll plaza data, focusing on de-congesting national highways. The solution combined modern tools and technologies, including **Kafka in KRaft mode** and **MariaDB** for data storage, running efficiently on **WSL Ubuntu**.
+
+### **Key Accomplishments**
+- **Kafka in KRaft Mode**:  
+  I replaced the traditional Zookeeper dependency with Kafka's KRaft mode for cluster management. Topics were created programmatically using the `confluent_kafka` Python library, ensuring ease of management and modern deployment practices.
+
+- **Data Streaming**:  
+  Real-time streaming of toll data was established with Kafka. I configured partitions and set up durable and fault-tolerant topics to handle large volumes of incoming data.
+
+- **Data Storage**:  
+  MariaDB served as the structured database for persisting the toll data. The data pipeline loaded streaming records seamlessly into database tables optimized for performance and analysis.
+
+- **WSL Ubuntu Environment**:  
+  Leveraging WSL provided a stable, Linux-based environment on my Windows machine to orchestrate services, run scripts, and manage configuration files effectively.
+
+### **Best Practices Applied**
+- Fault tolerance and scalability were integrated into the solution using Kafka's topic replication and robust consumer handling.
+- Maintainability was achieved by programmatically managing Kafka topics using the `AdminClient`.
+- MariaDB provided a reliable and performant backend to store real-time streaming data.
+
+---
+
+Throughout the project, I demonstrated **data engineering** best practices by focusing on fault tolerance, scalability, and maintainability. This solution can serve as a robust foundation for further extensions, such as:
+- Real-time analytics dashboards
+- Data validation mechanisms  
+- Integrations with machine learning pipelines for traffic prediction.
+
+This portfolio reflects my proficiency with modern tools such as **Kafka**, **MariaDB**, **Python**, and **Linux environments**, and my ability to build scalable and efficient data pipelines for real-world applications.
 
 
 
