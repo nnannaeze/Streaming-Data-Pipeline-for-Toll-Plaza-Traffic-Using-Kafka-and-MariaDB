@@ -94,7 +94,8 @@ Ensure the following components are installed before proceeding:
     ```bash
     ls /opt
     ```
-
+a1.PNG
+   
    from the above image, it is clear that kafka_2.13-3.9.0 successfully downloaded 
 
 
