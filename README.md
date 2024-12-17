@@ -56,7 +56,7 @@ Ensure the following components are installed before proceeding:
 2.  **Download and Set Up Apache Kafka 3.9.0**
 
 
-    Change to the `/tmp` directory to download the Kafka package:
+- ***Change to the `/tmp` directory to download the Kafka package:***
   
     ```bash
     cd /tmp
@@ -75,7 +75,7 @@ Ensure the following components are installed before proceeding:
     ```
     This will create a directory named kafka_2.13-3.9.0.
 
-3. **Move Kafka to the `/opt` Directory**
+- ***Move Kafka to the `/opt` Directory***
    
    Move the extracted Kafka directory to `/opt`:
 
@@ -87,17 +87,50 @@ Ensure the following components are installed before proceeding:
    mv /opt/kafka_2.13-3.9.0 /opt/kafka
    ```
 
-5. **Verify Kafka Installation**
+- ***Verify Kafka Installation***
 
     List the files in the `/opt` directory to confirm Kafka has been moved successfully:
 
     ```bash
     ls /opt
     ```
-a1.PNG
+![img001](a1.PNG)
    
    from the above image, it is clear that kafka_2.13-3.9.0 successfully downloaded 
+   
+3 **Install Python Drivers and Libraries**
+- ***Kafka Python Driver***:
+  
+  I used confluent-kafka, which is more performant and reliable
+  ```bash
+  pip install confluent-kafka
+  ```
+- ***Python Virtual Environment***
+  ```bash
+    python3 -m venv myenv
+    source myenv/bin/activate
+  ```
 
+- ***MySQL(Mariadb) Python Driver***:
+
+  I used mariadb as python-connector, but before that i had to install ***mariadb-server mariadb-client libmariadb-dev***
+  ```bash
+  sudo apt-get install mariadb-server mariadb-client libmariadb-dev
+  ```
+  and after that i checked the location of the mariadb_config using the ***which*** command
+  ```bash
+  which mariadb_config
+  ```
+  the Output ***/usr/bin/mariadb_config*** showed the exact location, so I had to move the MARIADB_CONFIG to /usr/bin/mariadb_config
+  ```bash
+   export MARIADB_CONFIG=/usr/bin/mariadb_config
+  ```
+  and then Lastly, 
+  
+  ```bash
+  pip install mariadb
+  ```
+![img101](a2.png)
 
 
     
